@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.npm-cache/
+AGENTS.md
+.DS_Store
+*.log
