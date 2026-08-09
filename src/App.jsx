@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "已結案"];
+const STORAGE_KEY = "factory-incident-dispatch-system:v2";
 
 const severityMeta = {
   一般: { tone: "slate", score: 1 },
@@ -160,8 +161,79 @@ function minutesLabel(minutes) {
   return rest ? `${hours} 小時 ${rest} 分` : `${hours} 小時`;
 }
 
+function nowLabel() {
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
+function createHistory({ action, actor, status, note }) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    time: nowLabel(),
+    action,
+    actor,
+    status,
+    note,
+  };
+}
+
+function ensureHistory(incident) {
+  if (Array.isArray(incident.history) && incident.history.length > 0) {
+    return incident;
+  }
+
+  return {
+    ...incident,
+    history: [
+      {
+        id: `${incident.id}-created`,
+        time: incident.time,
+        action: "建立異常回報",
+        actor: incident.reporter,
+        status: "待確認",
+        note: incident.description,
+      },
+      ...(incident.owner !== "未指派"
+        ? [
+            {
+              id: `${incident.id}-assigned`,
+              time: incident.time,
+              action: "指派處理人員",
+              actor: "主管",
+              status: incident.status,
+              note: `指派給 ${incident.owner}`,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+function loadIncidents() {
+  if (typeof window === "undefined") {
+    return initialIncidents.map(ensureHistory);
+  }
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return initialIncidents.map(ensureHistory);
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return initialIncidents.map(ensureHistory);
+    }
+    return parsed.map(ensureHistory);
+  } catch {
+    return initialIncidents.map(ensureHistory);
+  }
+}
+
 export function App() {
-  const [incidents, setIncidents] = useState(initialIncidents);
+  const [incidents, setIncidents] = useState(loadIncidents);
   const [selectedId, setSelectedId] = useState(initialIncidents[0].id);
   const [lineFilter, setLineFilter] = useState("全部產線");
   const [statusFilter, setStatusFilter] = useState("全部狀態");
@@ -169,6 +241,10 @@ export function App() {
   const [draft, setDraft] = useState(emptyDraft);
 
   const selected = incidents.find((item) => item.id === selectedId) ?? incidents[0];
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(incidents));
+  }, [incidents]);
 
   const filteredIncidents = useMemo(() => {
     return incidents
@@ -214,18 +290,76 @@ export function App() {
     );
   }
 
+  function appendHistory(incident, entry) {
+    return {
+      ...incident,
+      history: [...(incident.history ?? []), entry],
+    };
+  }
+
+  function assignOwner(owner) {
+    setIncidents((current) =>
+      current.map((item) => {
+        if (item.id !== selected.id) return item;
+        const status = item.status === "待確認" ? "已派工" : item.status;
+        return appendHistory(
+          { ...item, owner, status },
+          createHistory({
+            action: "指派處理人員",
+            actor: "主管",
+            status,
+            note: `處理人員：${owner}`,
+          }),
+        );
+      }),
+    );
+  }
+
   function advanceIncident(id) {
     setIncidents((current) =>
+      current.map((item) => {
+        if (item.id !== id) return item;
+        const status = nextStatus(item.status);
+        const owner = item.owner === "未指派" ? "林維修" : item.owner;
+        return appendHistory(
+          { ...item, status, owner },
+          createHistory({
+            action: "推進處理狀態",
+            actor: owner,
+            status,
+            note: `狀態由「${item.status}」更新為「${status}」`,
+          }),
+        );
+      }),
+    );
+  }
+
+  function recordRcaUpdate() {
+    setIncidents((current) =>
       current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: nextStatus(item.status),
-              owner: item.owner === "未指派" ? "林維修" : item.owner,
-            }
+        item.id === selected.id
+          ? appendHistory(
+              item,
+              createHistory({
+                action: "更新 RCA 紀錄",
+                actor: item.owner === "未指派" ? "主管" : item.owner,
+                status: item.status,
+                note: "已更新原因、處理方式或預防再發措施。",
+              }),
+            )
           : item,
       ),
     );
+  }
+
+  function resetDemo() {
+    const restored = initialIncidents.map(ensureHistory);
+    setIncidents(restored);
+    setSelectedId(restored[0].id);
+    setLineFilter("全部產線");
+    setStatusFilter("全部狀態");
+    setSeverityFilter("全部等級");
+    window.localStorage.removeItem(STORAGE_KEY);
   }
 
   function createIncident(event) {
@@ -243,6 +377,14 @@ export function App() {
       ...draft,
       description: draft.description || "現場回報異常，等待主管確認影響範圍。",
     };
+    incident.history = [
+      createHistory({
+        action: "建立異常回報",
+        actor: incident.reporter,
+        status: incident.status,
+        note: incident.description,
+      }),
+    ];
     setIncidents((current) => [incident, ...current]);
     setSelectedId(incident.id);
     setDraft(emptyDraft);
@@ -292,6 +434,7 @@ export function App() {
           <div className="hero-actions">
             <a href="#new-report">新增異常</a>
             <a href="#dispatch">查看派工</a>
+            <button type="button" onClick={resetDemo}>重設展示</button>
           </div>
         </header>
 
@@ -405,13 +548,29 @@ export function App() {
             <div className="assign-row">
               <label>
                 指派人員
-                <select value={selected.owner} onChange={(event) => updateSelected({ owner: event.target.value, status: selected.status === "待確認" ? "已派工" : selected.status })}>
+                <select value={selected.owner} onChange={(event) => assignOwner(event.target.value)}>
                   {ownerOptions.map((owner) => (
                     <option key={owner}>{owner}</option>
                   ))}
                 </select>
               </label>
               <button type="button" onClick={() => advanceIncident(selected.id)}>推進狀態</button>
+            </div>
+            <div className="timeline-preview">
+              <div className="timeline-title">
+                <span>處理歷程</span>
+                <strong>{selected.history?.length ?? 0}</strong>
+              </div>
+              {(selected.history ?? []).slice(-4).reverse().map((event) => (
+                <article key={event.id} className="timeline-item">
+                  <time>{event.time}</time>
+                  <div>
+                    <strong>{event.action}</strong>
+                    <small>{event.actor}｜{event.status}</small>
+                    <p>{event.note}</p>
+                  </div>
+                </article>
+              ))}
             </div>
           </section>
         </section>
@@ -492,6 +651,9 @@ export function App() {
               預防再發措施
               <textarea value={selected.prevention} onChange={(event) => updateSelected({ prevention: event.target.value })} />
             </label>
+            <button type="button" className="secondary-button" onClick={recordRcaUpdate}>
+              記錄 RCA 更新
+            </button>
           </section>
 
           <section className="panel" id="analytics">
