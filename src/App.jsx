@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
-const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "已結案"];
-const STORAGE_KEY = "factory-incident-dispatch-system:v2";
+const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "待驗收", "已結案"];
+const STORAGE_KEY = "factory-incident-dispatch-system:v3";
 
 const severityMeta = {
-  一般: { tone: "slate", score: 1 },
-  急件: { tone: "amber", score: 2 },
-  停線: { tone: "red", score: 3 },
-  安全風險: { tone: "violet", score: 4 },
+  一般: { tone: "slate", score: 1, slaMinutes: 480 },
+  急件: { tone: "amber", score: 2, slaMinutes: 120 },
+  停線: { tone: "red", score: 3, slaMinutes: 60 },
+  安全風險: { tone: "violet", score: 4, slaMinutes: 30 },
 };
 
 const statusTone = {
@@ -16,6 +16,7 @@ const statusTone = {
   處理中: "cyan",
   待料: "amber",
   已排除: "green",
+  待驗收: "blue",
   已結案: "green",
 };
 
@@ -38,6 +39,7 @@ const initialIncidents = [
     cause: "主軸軸承磨耗，切削負載升高。",
     action: "暫停 CNC-03，改由 CNC-05 接續急件工單，維修確認備品。",
     prevention: "新增主軸振動點檢週期，連續兩次異常需提前保養。",
+    reviewNote: "",
   },
   {
     id: "INC-260711-002",
@@ -55,6 +57,7 @@ const initialIncidents = [
     cause: "換線治具未提前備妥。",
     action: "調整工單順序，先安排相同治具產品。",
     prevention: "換線前 30 分鐘由生管確認治具與刀具備料。",
+    reviewNote: "",
   },
   {
     id: "INC-260711-003",
@@ -72,6 +75,7 @@ const initialIncidents = [
     cause: "油壓閥回壓不穩，需更換密封件。",
     action: "等待備品到料，暫以 B 線支援部分產能。",
     prevention: "建立油壓閥備品安全庫存，低於 2 組自動提醒。",
+    reviewNote: "",
   },
   {
     id: "INC-260711-004",
@@ -81,7 +85,7 @@ const initialIncidents = [
     workOrder: "MO-260711-017",
     type: "品質異常",
     severity: "急件",
-    status: "已排除",
+    status: "待驗收",
     reporter: "黃品管",
     owner: "黃品管",
     downtime: 25,
@@ -89,6 +93,7 @@ const initialIncidents = [
     cause: "定位銷鬆動造成夾治具偏移。",
     action: "重新鎖固定位銷，補做首件確認與抽驗。",
     prevention: "品檢異常回饋加工站，首件檢查增加治具定位確認。",
+    reviewNote: "已完成首件確認，抽驗結果正常，待主管簽核結案。",
   },
   {
     id: "INC-260711-005",
@@ -106,6 +111,7 @@ const initialIncidents = [
     cause: "",
     action: "",
     prevention: "",
+    reviewNote: "",
   },
   {
     id: "INC-260711-006",
@@ -123,6 +129,7 @@ const initialIncidents = [
     cause: "暫存區標示不足，晚班交接未確認。",
     action: "立即清空通道，重新標示暫存區與搬運路線。",
     prevention: "班前點檢新增通道淨空確認，異常拍照回報。",
+    reviewNote: "",
   },
 ];
 
@@ -151,6 +158,57 @@ function ProgressBar({ value, tone = "blue" }) {
 function nextStatus(current) {
   const index = statusFlow.indexOf(current);
   return statusFlow[Math.min(index + 1, statusFlow.length - 1)];
+}
+
+function timeToMinutes(time) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time);
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function getElapsedMinutes(incident) {
+  const currentDemoTime = 16 * 60 + 20;
+  return Math.max(currentDemoTime - timeToMinutes(incident.time), 0);
+}
+
+function getSlaInfo(incident) {
+  const limit = severityMeta[incident.severity].slaMinutes;
+  const elapsed = getElapsedMinutes(incident);
+  const remaining = limit - elapsed;
+
+  if (incident.status === "已結案") {
+    return {
+      label: "已結案",
+      tone: "green",
+      detail: "主管已完成驗收，不列入逾時追蹤。",
+      progress: 100,
+    };
+  }
+
+  if (remaining <= 0) {
+    return {
+      label: "已逾時",
+      tone: "red",
+      detail: `已超過 SLA ${minutesLabel(Math.abs(remaining))}，需優先追蹤。`,
+      progress: 100,
+    };
+  }
+
+  if (remaining <= Math.max(30, limit * 0.25)) {
+    return {
+      label: "即將逾時",
+      tone: "amber",
+      detail: `剩餘 ${minutesLabel(remaining)}，建議主管確認處理進度。`,
+      progress: Math.round((elapsed / limit) * 100),
+    };
+  }
+
+  return {
+    label: "SLA 正常",
+    tone: "blue",
+    detail: `剩餘 ${minutesLabel(remaining)}，標準處理時限 ${minutesLabel(limit)}。`,
+    progress: Math.round((elapsed / limit) * 100),
+  };
 }
 
 function minutesLabel(minutes) {
@@ -183,30 +241,35 @@ function createHistory({ action, actor, status, note }) {
 }
 
 function ensureHistory(incident) {
-  if (Array.isArray(incident.history) && incident.history.length > 0) {
-    return incident;
+  const normalized = {
+    reviewNote: "",
+    ...incident,
+  };
+
+  if (Array.isArray(normalized.history) && normalized.history.length > 0) {
+    return normalized;
   }
 
   return {
-    ...incident,
+    ...normalized,
     history: [
       {
-        id: `${incident.id}-created`,
-        time: incident.time,
+        id: `${normalized.id}-created`,
+        time: normalized.time,
         action: "建立異常回報",
-        actor: incident.reporter,
+        actor: normalized.reporter,
         status: "待確認",
-        note: incident.description,
+        note: normalized.description,
       },
-      ...(incident.owner !== "未指派"
+      ...(normalized.owner !== "未指派"
         ? [
             {
-              id: `${incident.id}-assigned`,
-              time: incident.time,
+              id: `${normalized.id}-assigned`,
+              time: normalized.time,
               action: "指派處理人員",
               actor: "主管",
-              status: incident.status,
-              note: `指派給 ${incident.owner}`,
+              status: normalized.status,
+              note: `指派給 ${normalized.owner}`,
             },
           ]
         : []),
@@ -284,6 +347,18 @@ export function App() {
       .slice(0, 5);
   }, [incidents]);
 
+  const slaStats = useMemo(() => {
+    return incidents.reduce(
+      (acc, item) => {
+        const sla = getSlaInfo(item);
+        if (sla.label === "已逾時") acc.overdue += 1;
+        if (sla.label === "即將逾時") acc.warning += 1;
+        return acc;
+      },
+      { overdue: 0, warning: 0 },
+    );
+  }, [incidents]);
+
   function updateSelected(patch) {
     setIncidents((current) =>
       current.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)),
@@ -334,6 +409,24 @@ export function App() {
     );
   }
 
+  function closeIncident() {
+    setIncidents((current) =>
+      current.map((item) => {
+        if (item.id !== selected.id) return item;
+        const note = item.reviewNote || "主管驗收完成，確認異常已排除並完成結案。";
+        return appendHistory(
+          { ...item, status: "已結案", reviewNote: note },
+          createHistory({
+            action: "主管驗收結案",
+            actor: "主管",
+            status: "已結案",
+            note,
+          }),
+        );
+      }),
+    );
+  }
+
   function recordRcaUpdate() {
     setIncidents((current) =>
       current.map((item) =>
@@ -374,6 +467,7 @@ export function App() {
       cause: "",
       action: "",
       prevention: "",
+      reviewNote: "",
       ...draft,
       description: draft.description || "現場回報異常，等待主管確認影響範圍。",
     };
@@ -392,6 +486,7 @@ export function App() {
 
   const maxType = Math.max(...typeStats.map((item) => item.value), 1);
   const maxMachine = Math.max(...machineStats.map((item) => item.value), 1);
+  const selectedSla = getSlaInfo(selected);
 
   return (
     <main className="app-shell">
@@ -407,6 +502,7 @@ export function App() {
           <a href="#overview" className="active">異常總覽</a>
           <a href="#new-report">新增回報</a>
           <a href="#dispatch">派工看板</a>
+          <a href="#review">主管驗收</a>
           <a href="#rca">RCA 紀錄</a>
           <a href="#analytics">異常分析</a>
         </nav>
@@ -458,6 +554,11 @@ export function App() {
             <span>平均停機時間</span>
             <strong>{metrics.avg}分</strong>
             <small>累計 {metrics.totalDowntime} 分鐘</small>
+          </article>
+          <article>
+            <span>SLA 風險</span>
+            <strong>{slaStats.overdue}</strong>
+            <small>{slaStats.warning} 件即將逾時</small>
           </article>
         </section>
 
@@ -543,6 +644,17 @@ export function App() {
                 <span>停機時間</span>
                 <strong>{minutesLabel(selected.downtime)}</strong>
               </div>
+              <div>
+                <span>SLA 狀態</span>
+                <strong>{selectedSla.label}</strong>
+              </div>
+            </div>
+            <div className={`sla-card ${selectedSla.tone}`}>
+              <div>
+                <span>處理時限</span>
+                <strong>{selectedSla.detail}</strong>
+              </div>
+              <ProgressBar value={selectedSla.progress} tone={selectedSla.tone} />
             </div>
             <p className="description">{selected.description}</p>
             <div className="assign-row">
@@ -621,7 +733,10 @@ export function App() {
                       <span>{incident.id}</span>
                       <strong>{incident.type}</strong>
                       <small>{incident.line}｜{incident.machine}</small>
-                      <Pill tone={severityMeta[incident.severity].tone}>{incident.severity}</Pill>
+                      <div className="card-pills">
+                        <Pill tone={severityMeta[incident.severity].tone}>{incident.severity}</Pill>
+                        <Pill tone={getSlaInfo(incident).tone}>{getSlaInfo(incident).label}</Pill>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -631,6 +746,41 @@ export function App() {
         </section>
 
         <section className="two-column">
+          <section className="panel" id="review">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Supervisor Review</p>
+                <h2>主管驗收與結案</h2>
+              </div>
+              <Pill tone={statusTone[selected.status]}>{selected.status}</Pill>
+            </div>
+            <div className="review-checklist">
+              <div className={selected.cause ? "done" : ""}>
+                <span>1</span>
+                <strong>原因已填寫</strong>
+              </div>
+              <div className={selected.action ? "done" : ""}>
+                <span>2</span>
+                <strong>處理方式已填寫</strong>
+              </div>
+              <div className={selected.prevention ? "done" : ""}>
+                <span>3</span>
+                <strong>預防再發已填寫</strong>
+              </div>
+            </div>
+            <label className="full-field">
+              主管驗收備註
+              <textarea
+                value={selected.reviewNote}
+                onChange={(event) => updateSelected({ reviewNote: event.target.value })}
+                placeholder="例如：確認機台恢復、首件檢查合格、現場安全風險已排除..."
+              />
+            </label>
+            <button type="button" className="primary-button" onClick={closeIncident}>
+              主管驗收並結案
+            </button>
+          </section>
+
           <section className="panel" id="rca">
             <div className="panel-heading">
               <div>

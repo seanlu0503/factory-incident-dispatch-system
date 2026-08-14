@@ -22,6 +22,9 @@ final result: passed
   - select incident cards from dispatch board
   - assign owner
   - advance incident status
+  - track SLA status by severity
+  - route completed work through pending review before closing
+  - record supervisor review notes when closing an incident
   - append timeline events for incident creation, assignment, status changes, and RCA updates
   - edit cause, action, and prevention fields
   - reset demo data

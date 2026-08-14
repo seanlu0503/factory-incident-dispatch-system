@@ -227,7 +227,7 @@ a {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -375,7 +375,7 @@ textarea {
 
 .incident-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -401,6 +401,49 @@ textarea {
   margin-top: 6px;
   color: #1a2a3a;
   font-size: 18px;
+}
+
+.sla-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid #cfe0e8;
+  border-radius: 8px;
+  background: #f7fbfd;
+  padding: 12px;
+}
+
+.sla-card span,
+.sla-card strong {
+  display: block;
+}
+
+.sla-card span {
+  color: #667784;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sla-card strong {
+  margin-top: 4px;
+  color: #1f3446;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sla-card.amber {
+  border-color: #f1d391;
+  background: #fff8ea;
+}
+
+.sla-card.red {
+  border-color: #f2b7b0;
+  background: #fff1ef;
+}
+
+.sla-card.green {
+  border-color: #b8ddc5;
+  background: #f0faf4;
 }
 
 .description {
@@ -507,7 +550,7 @@ textarea {
 
 .status-board {
   display: grid;
-  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  grid-template-columns: repeat(7, minmax(154px, 1fr));
   gap: 12px;
   width: 100%;
   max-width: 100%;
@@ -577,6 +620,58 @@ textarea {
   font-size: 12px;
 }
 
+.card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-checklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-checklist div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f8fafb;
+  color: #607382;
+  min-height: 48px;
+  padding: 10px;
+}
+
+.review-checklist span {
+  display: grid;
+  flex: 0 0 26px;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #e6edf2;
+  color: #52616d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.review-checklist strong {
+  color: #405362;
+  font-size: 13px;
+}
+
+.review-checklist .done {
+  border-color: #b8ddc5;
+  background: #f0faf4;
+}
+
+.review-checklist .done span {
+  background: #286f45;
+  color: #ffffff;
+}
+
 .chart-block {
   display: grid;
   gap: 11px;
@@ -630,6 +725,14 @@ textarea {
   background: #c98724;
 }
 
+.progress-fill.red {
+  background: #b83d35;
+}
+
+.progress-fill.green {
+  background: #286f45;
+}
+
 @media (max-width: 1180px) {
   .app-shell,
   .two-column {
@@ -642,11 +745,11 @@ textarea {
   }
 
   .nav-list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -680,7 +783,8 @@ textarea {
   .kpi-grid,
   .form-grid,
   .incident-summary,
-  .assign-row {
+  .assign-row,
+  .review-checklist {
     grid-template-columns: 1fr;
   }
 
@@ -695,6 +799,6 @@ textarea {
   }
 
   .status-board {
-    grid-template-columns: repeat(6, 210px);
+    grid-template-columns: repeat(7, 210px);
   }
 }
