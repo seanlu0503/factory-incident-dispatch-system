@@ -21,6 +21,17 @@ const statusTone = {
 };
 
 const ownerOptions = ["未指派", "林維修", "曾工程師", "黃品管", "陳生管", "吳班長"];
+const improvementOptions = ["待改善", "改善中", "待稽核", "已改善"];
+
+const processSteps = [
+  { status: "待確認", owner: "現場主管", detail: "確認影響範圍與嚴重程度" },
+  { status: "已派工", owner: "主管", detail: "指派維修、生管或品管處理" },
+  { status: "處理中", owner: "責任人員", detail: "排除異常並回填處置方式" },
+  { status: "待料", owner: "生管/採購", detail: "追蹤備品、物料或替代方案" },
+  { status: "已排除", owner: "責任人員", detail: "異常暫時排除，等待確認" },
+  { status: "待驗收", owner: "主管", detail: "檢查 RCA 與預防再發紀錄" },
+  { status: "已結案", owner: "主管", detail: "完成驗收並追蹤改善落地" },
+];
 
 const initialIncidents = [
   {
@@ -40,6 +51,7 @@ const initialIncidents = [
     action: "暫停 CNC-03，改由 CNC-05 接續急件工單，維修確認備品。",
     prevention: "新增主軸振動點檢週期，連續兩次異常需提前保養。",
     reviewNote: "",
+    improvementStatus: "改善中",
   },
   {
     id: "INC-260711-002",
@@ -58,6 +70,7 @@ const initialIncidents = [
     action: "調整工單順序，先安排相同治具產品。",
     prevention: "換線前 30 分鐘由生管確認治具與刀具備料。",
     reviewNote: "",
+    improvementStatus: "待稽核",
   },
   {
     id: "INC-260711-003",
@@ -76,6 +89,7 @@ const initialIncidents = [
     action: "等待備品到料，暫以 B 線支援部分產能。",
     prevention: "建立油壓閥備品安全庫存，低於 2 組自動提醒。",
     reviewNote: "",
+    improvementStatus: "待改善",
   },
   {
     id: "INC-260711-004",
@@ -94,6 +108,7 @@ const initialIncidents = [
     action: "重新鎖固定位銷，補做首件確認與抽驗。",
     prevention: "品檢異常回饋加工站，首件檢查增加治具定位確認。",
     reviewNote: "已完成首件確認，抽驗結果正常，待主管簽核結案。",
+    improvementStatus: "待稽核",
   },
   {
     id: "INC-260711-005",
@@ -112,6 +127,7 @@ const initialIncidents = [
     action: "",
     prevention: "",
     reviewNote: "",
+    improvementStatus: "待改善",
   },
   {
     id: "INC-260711-006",
@@ -130,6 +146,7 @@ const initialIncidents = [
     action: "立即清空通道，重新標示暫存區與搬運路線。",
     prevention: "班前點檢新增通道淨空確認，異常拍照回報。",
     reviewNote: "",
+    improvementStatus: "改善中",
   },
 ];
 
@@ -243,6 +260,7 @@ function createHistory({ action, actor, status, note }) {
 function ensureHistory(incident) {
   const normalized = {
     reviewNote: "",
+    improvementStatus: "待改善",
     ...incident,
   };
 
@@ -359,6 +377,13 @@ export function App() {
     );
   }, [incidents]);
 
+  const improvementStats = useMemo(() => {
+    return incidents.reduce((acc, item) => {
+      acc[item.improvementStatus] = (acc[item.improvementStatus] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [incidents]);
+
   function updateSelected(patch) {
     setIncidents((current) =>
       current.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)),
@@ -445,6 +470,24 @@ export function App() {
     );
   }
 
+  function updateImprovementStatus(status) {
+    setIncidents((current) =>
+      current.map((item) =>
+        item.id === selected.id
+          ? appendHistory(
+              { ...item, improvementStatus: status },
+              createHistory({
+                action: "更新改善追蹤",
+                actor: "主管",
+                status: item.status,
+                note: `改善狀態由「${item.improvementStatus}」更新為「${status}」。`,
+              }),
+            )
+          : item,
+      ),
+    );
+  }
+
   function resetDemo() {
     const restored = initialIncidents.map(ensureHistory);
     setIncidents(restored);
@@ -468,6 +511,7 @@ export function App() {
       action: "",
       prevention: "",
       reviewNote: "",
+      improvementStatus: "待改善",
       ...draft,
       description: draft.description || "現場回報異常，等待主管確認影響範圍。",
     };
@@ -502,7 +546,9 @@ export function App() {
           <a href="#overview" className="active">異常總覽</a>
           <a href="#new-report">新增回報</a>
           <a href="#dispatch">派工看板</a>
+          <a href="#rules">流程規則</a>
           <a href="#review">主管驗收</a>
+          <a href="#improvement">改善追蹤</a>
           <a href="#rca">RCA 紀錄</a>
           <a href="#analytics">異常分析</a>
         </nav>
@@ -745,6 +791,58 @@ export function App() {
           </div>
         </section>
 
+        <section className="two-column" id="rules">
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">SLA Rules</p>
+                <h2>嚴重程度與處理時限</h2>
+              </div>
+            </div>
+            <div className="sla-rule-grid">
+              {Object.entries(severityMeta).map(([severity, meta]) => (
+                <article key={severity}>
+                  <Pill tone={meta.tone}>{severity}</Pill>
+                  <strong>{minutesLabel(meta.slaMinutes)}</strong>
+                  <small>
+                    {severity === "安全風險"
+                      ? "立即隔離風險並通知主管"
+                      : severity === "停線"
+                        ? "優先恢復產線與替代產能"
+                        : severity === "急件"
+                          ? "當班追蹤，避免影響交期"
+                          : "例行追蹤並納入交接"}
+                  </small>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Process Map</p>
+                <h2>異常處理流程圖</h2>
+              </div>
+            </div>
+            <div className="process-map">
+              {processSteps.map((step, index) => (
+                <article
+                  key={step.status}
+                  className={`process-step ${selected.status === step.status ? "active" : ""}`}
+                >
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{step.status}</strong>
+                    <small>{step.owner}</small>
+                    <p>{step.detail}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </section>
+
         <section className="two-column">
           <section className="panel" id="review">
             <div className="panel-heading">
@@ -779,6 +877,32 @@ export function App() {
             <button type="button" className="primary-button" onClick={closeIncident}>
               主管驗收並結案
             </button>
+          </section>
+
+          <section className="panel" id="improvement">
+            <div className="panel-heading">
+              <div>
+                <p className="section-label">Improvement Tracking</p>
+                <h2>改善追蹤</h2>
+              </div>
+              <Pill tone="green">{selected.improvementStatus}</Pill>
+            </div>
+            <div className="improvement-board">
+              {improvementOptions.map((status) => (
+                <button
+                  type="button"
+                  key={status}
+                  className={selected.improvementStatus === status ? "active" : ""}
+                  onClick={() => updateImprovementStatus(status)}
+                >
+                  <span>{status}</span>
+                  <strong>{improvementStats[status] ?? 0}</strong>
+                </button>
+              ))}
+            </div>
+            <p className="improvement-note">
+              改善追蹤用來確認 RCA 的預防再發措施是否真的落地，例如點檢週期、備品安全庫存、首件確認或現場標示改善。
+            </p>
           </section>
 
           <section className="panel" id="rca">

@@ -23,8 +23,11 @@ final result: passed
   - assign owner
   - advance incident status
   - track SLA status by severity
+  - explain severity-based SLA rules
+  - show the full incident handling process map
   - route completed work through pending review before closing
   - record supervisor review notes when closing an incident
+  - track RCA improvement status after review
   - append timeline events for incident creation, assignment, status changes, and RCA updates
   - edit cause, action, and prevention fields
   - reset demo data

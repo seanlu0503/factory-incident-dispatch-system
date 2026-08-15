@@ -626,6 +626,108 @@ textarea {
   gap: 6px;
 }
 
+.sla-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sla-rule-grid article {
+  display: grid;
+  gap: 9px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f8fafb;
+  min-height: 126px;
+  padding: 12px;
+}
+
+.sla-rule-grid strong {
+  color: #172536;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sla-rule-grid small {
+  color: #607382;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.process-map {
+  display: grid;
+  gap: 8px;
+}
+
+.process-step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 10px;
+}
+
+.process-step + .process-step::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 24px;
+  width: 2px;
+  height: 8px;
+  background: #c8d5de;
+}
+
+.process-step > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #e6edf2;
+  color: #52616d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.process-step strong,
+.process-step small,
+.process-step p {
+  display: block;
+}
+
+.process-step strong {
+  color: #213546;
+  font-size: 14px;
+}
+
+.process-step small {
+  margin-top: 2px;
+  color: #607382;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.process-step p {
+  margin: 4px 0 0;
+  color: #566a79;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.process-step.active {
+  border-color: #8eb4c5;
+  background: #eef7fa;
+}
+
+.process-step.active > span {
+  background: #24596f;
+  color: #ffffff;
+}
+
 .review-checklist {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -670,6 +772,56 @@ textarea {
 .review-checklist .done span {
   background: #286f45;
   color: #ffffff;
+}
+
+.improvement-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.improvement-board button {
+  display: grid;
+  gap: 7px;
+  min-height: 72px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f8fafb;
+  color: #405362;
+  padding: 11px;
+  text-align: left;
+}
+
+.improvement-board button:hover,
+.improvement-board button.active {
+  border-color: #9bc8ad;
+  background: #f0faf4;
+}
+
+.improvement-board span,
+.improvement-board strong {
+  display: block;
+}
+
+.improvement-board span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.improvement-board strong {
+  color: #1a2a3a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.improvement-note {
+  margin: 12px 0 0;
+  border-left: 4px solid #286f45;
+  background: #f5faf7;
+  color: #526574;
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 11px;
 }
 
 .chart-block {
@@ -751,6 +903,11 @@ textarea {
   .kpi-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .sla-rule-grid,
+  .improvement-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -784,7 +941,9 @@ textarea {
   .form-grid,
   .incident-summary,
   .assign-row,
-  .review-checklist {
+  .review-checklist,
+  .sla-rule-grid,
+  .improvement-board {
     grid-template-columns: 1fr;
   }
 
