@@ -373,6 +373,13 @@ textarea {
   margin-top: 14px;
 }
 
+.primary-button:disabled {
+  cursor: not-allowed;
+  border-color: #aebcc6;
+  background: #aebcc6;
+  color: #f6f8fa;
+}
+
 .incident-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -730,7 +737,7 @@ textarea {
 
 .review-checklist {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -772,6 +779,44 @@ textarea {
 .review-checklist .done span {
   background: #286f45;
   color: #ffffff;
+}
+
+.closure-status {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  border: 1px solid #dce5eb;
+  border-left: 4px solid #9aadb9;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 11px;
+}
+
+.closure-status strong {
+  color: #33495a;
+  font-size: 13px;
+}
+
+.closure-status span {
+  color: #607382;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.closure-status.ready,
+.closure-status.complete {
+  border-color: #b8ddc5;
+  border-left-color: #286f45;
+  background: #f0faf4;
+}
+
+.closure-status.complete strong {
+  color: #286f45;
+}
+
+.closure-status.pending {
+  border-left-color: #c98724;
+  background: #fffaf0;
 }
 
 .improvement-board {
@@ -905,7 +950,8 @@ textarea {
   }
 
   .sla-rule-grid,
-  .improvement-board {
+  .improvement-board,
+  .review-checklist {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "待驗收", "已結案"];
-const STORAGE_KEY = "factory-incident-dispatch-system:v3";
+const STORAGE_KEY = "factory-incident-dispatch-system:v4";
 
 const severityMeta = {
   一般: { tone: "slate", score: 1, slaMinutes: 480 },
@@ -261,6 +261,7 @@ function ensureHistory(incident) {
   const normalized = {
     reviewNote: "",
     improvementStatus: "待改善",
+    closure: null,
     ...incident,
   };
 
@@ -293,6 +294,16 @@ function ensureHistory(incident) {
         : []),
     ],
   };
+}
+
+function getClosureChecks(incident) {
+  return [
+    { label: "已進入待驗收", complete: incident.status === "待驗收" || incident.status === "已結案" },
+    { label: "根本原因已填寫", complete: Boolean(incident.cause?.trim()) },
+    { label: "處置方式已填寫", complete: Boolean(incident.action?.trim()) },
+    { label: "預防再發已填寫", complete: Boolean(incident.prevention?.trim()) },
+    { label: "主管驗收備註已填寫", complete: Boolean(incident.reviewNote?.trim()) },
+  ];
 }
 
 function loadIncidents() {
@@ -435,12 +446,23 @@ export function App() {
   }
 
   function closeIncident() {
+    const checks = getClosureChecks(selected);
+    if (checks.some((check) => !check.complete)) return;
+
     setIncidents((current) =>
       current.map((item) => {
         if (item.id !== selected.id) return item;
-        const note = item.reviewNote || "主管驗收完成，確認異常已排除並完成結案。";
+        const closedAt = nowLabel();
+        const note = item.reviewNote;
         return appendHistory(
-          { ...item, status: "已結案", reviewNote: note },
+          {
+            ...item,
+            status: "已結案",
+            closure: {
+              result: "驗收通過，異常已排除",
+              closedAt,
+            },
+          },
           createHistory({
             action: "主管驗收結案",
             actor: "主管",
@@ -531,6 +553,9 @@ export function App() {
   const maxType = Math.max(...typeStats.map((item) => item.value), 1);
   const maxMachine = Math.max(...machineStats.map((item) => item.value), 1);
   const selectedSla = getSlaInfo(selected);
+  const closureChecks = getClosureChecks(selected);
+  const canClose = closureChecks.every((check) => check.complete) && selected.status !== "已結案";
+  const remainingChecks = closureChecks.filter((check) => !check.complete);
 
   return (
     <main className="app-shell">
@@ -853,17 +878,25 @@ export function App() {
               <Pill tone={statusTone[selected.status]}>{selected.status}</Pill>
             </div>
             <div className="review-checklist">
-              <div className={selected.cause ? "done" : ""}>
+              <div className={closureChecks[0].complete ? "done" : ""}>
                 <span>1</span>
-                <strong>原因已填寫</strong>
+                <strong>案件進入待驗收</strong>
               </div>
-              <div className={selected.action ? "done" : ""}>
+              <div className={closureChecks[1].complete ? "done" : ""}>
                 <span>2</span>
-                <strong>處理方式已填寫</strong>
+                <strong>根本原因已填寫</strong>
               </div>
-              <div className={selected.prevention ? "done" : ""}>
+              <div className={closureChecks[2].complete ? "done" : ""}>
                 <span>3</span>
+                <strong>處置方式已填寫</strong>
+              </div>
+              <div className={closureChecks[3].complete ? "done" : ""}>
+                <span>4</span>
                 <strong>預防再發已填寫</strong>
+              </div>
+              <div className={closureChecks[4].complete ? "done" : ""}>
+                <span>5</span>
+                <strong>驗收備註已填寫</strong>
               </div>
             </div>
             <label className="full-field">
@@ -874,9 +907,26 @@ export function App() {
                 placeholder="例如：確認機台恢復、首件檢查合格、現場安全風險已排除..."
               />
             </label>
-            <button type="button" className="primary-button" onClick={closeIncident}>
-              主管驗收並結案
-            </button>
+            {selected.status === "已結案" ? (
+              <div className="closure-status complete">
+                <strong>{selected.closure?.result ?? "驗收通過，異常已排除"}</strong>
+                <span>結案時間：{selected.closure?.closedAt ?? "已完成記錄"}。改善追蹤會持續保留，確認預防措施是否落地。</span>
+              </div>
+            ) : (
+              <>
+                <div className={`closure-status ${canClose ? "ready" : "pending"}`}>
+                  <strong>{canClose ? "結案條件已完成" : "尚未符合結案條件"}</strong>
+                  <span>
+                    {canClose
+                      ? "主管確認後可將本案結案，並保留改善追蹤紀錄。"
+                      : `尚缺：${remainingChecks.map((check) => check.label).join("、")}`}
+                  </span>
+                </div>
+                <button type="button" className="primary-button" onClick={closeIncident} disabled={!canClose}>
+                  主管驗收並結案
+                </button>
+              </>
+            )}
           </section>
 
           <section className="panel" id="improvement">
