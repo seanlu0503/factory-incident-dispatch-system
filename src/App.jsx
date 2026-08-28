@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "待驗收", "已結案"];
-const STORAGE_KEY = "factory-incident-dispatch-system:v4";
+const STORAGE_KEY = "factory-incident-dispatch-system:v5";
 
 const severityMeta = {
   一般: { tone: "slate", score: 1, slaMinutes: 480 },
@@ -150,6 +150,32 @@ const initialIncidents = [
     reviewNote: "",
     improvementStatus: "改善中",
   },
+  {
+    id: "INC-260711-007",
+    time: "15:02",
+    line: "A 線",
+    machine: "CNC-03",
+    workOrder: "MO-260711-039",
+    type: "設備故障",
+    severity: "急件",
+    status: "已結案",
+    reporter: "林班長",
+    owner: "曾工程師",
+    downtime: 36,
+    description: "刀具壽命警示頻繁出現，造成加工站短暫停機與首件確認等待。",
+    cause: "刀具壽命參數未依材料批次調整，預警門檻設定過晚。",
+    action: "調整刀具壽命參數，完成首件確認並更新加工站設定。",
+    prevention: "每週回看刀具使用紀錄，材料批次變更時同步確認預警門檻。",
+    reviewNote: "連續兩週未再出現相同警示，抽查加工尺寸正常，主管驗收通過。",
+    improvementStatus: "已改善",
+    baselineDowntime: 36,
+    recentDowntime: 10,
+    followUpNote: "改善後兩週追蹤，同類警示造成的累計停機時間由 36 分降至 10 分。",
+    closure: {
+      result: "驗收通過，異常已排除",
+      closedAt: "07/11 15:48",
+    },
+  },
 ];
 
 const emptyDraft = {
@@ -293,6 +319,9 @@ function ensureHistory(incident) {
     reviewNote: "",
     improvementStatus: "待改善",
     closure: null,
+    baselineDowntime: incident.downtime ?? 0,
+    recentDowntime: null,
+    followUpNote: "",
     ...incident,
   };
 
@@ -335,6 +364,23 @@ function getClosureChecks(incident) {
     { label: "預防再發已填寫", complete: Boolean(incident.prevention?.trim()) },
     { label: "主管驗收備註已填寫", complete: Boolean(incident.reviewNote?.trim()) },
   ];
+}
+
+function getImprovementImpact(incident) {
+  const baseline = Number(incident.baselineDowntime);
+  const recent = incident.recentDowntime;
+  if (!Number.isFinite(baseline) || recent === null || recent === "") return null;
+
+  const latest = Number(recent);
+  if (!Number.isFinite(latest)) return null;
+
+  const difference = baseline - latest;
+  return {
+    baseline,
+    latest,
+    difference,
+    rate: baseline > 0 ? Math.round((difference / baseline) * 100) : 0,
+  };
 }
 
 function loadIncidents() {
@@ -426,6 +472,23 @@ export function App() {
       acc[item.improvementStatus] = (acc[item.improvementStatus] ?? 0) + 1;
       return acc;
     }, {});
+  }, [incidents]);
+
+  const improvementAnalytics = useMemo(() => {
+    const completed = incidents.filter((item) => item.status === "已結案").length;
+    const active = incidents.filter((item) => item.improvementStatus !== "已改善").length;
+    const impacts = incidents.map(getImprovementImpact).filter(Boolean);
+    const reducedMinutes = impacts.reduce((sum, item) => sum + Math.max(item.difference, 0), 0);
+    const typeCounts = incidents.reduce((acc, item) => {
+      acc[item.type] = (acc[item.type] ?? 0) + 1;
+      return acc;
+    }, {});
+    const recurring = Object.entries(typeCounts)
+      .filter(([, count]) => count > 1)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { completed, active, impacts, reducedMinutes, recurring };
   }, [incidents]);
 
   function updateSelected(patch) {
@@ -543,6 +606,27 @@ export function App() {
     );
   }
 
+  function recordImprovementEffect() {
+    const impact = getImprovementImpact(selected);
+    if (!impact) return;
+
+    setIncidents((current) =>
+      current.map((item) =>
+        item.id === selected.id
+          ? appendHistory(
+              item,
+              createHistory({
+                action: "記錄改善成效",
+                actor: "主管",
+                status: item.status,
+                note: `近期停機 ${impact.latest} 分；相較改善前 ${impact.baseline} 分，${impact.difference >= 0 ? "減少" : "增加"} ${Math.abs(impact.difference)} 分。`,
+              }),
+            )
+          : item,
+      ),
+    );
+  }
+
   function resetDemo() {
     const restored = initialIncidents.map(ensureHistory);
     setIncidents(restored);
@@ -592,6 +676,7 @@ export function App() {
   const closureChecks = getClosureChecks(selected);
   const canClose = closureChecks.every((check) => check.complete) && selected.status !== "已結案";
   const remainingChecks = closureChecks.filter((check) => !check.complete);
+  const selectedImpact = getImprovementImpact(selected);
 
   return (
     <main className="app-shell">
@@ -610,6 +695,7 @@ export function App() {
           <a href="#rules">流程規則</a>
           <a href="#review">主管驗收</a>
           <a href="#improvement">改善追蹤</a>
+          <a href="#effectiveness">成效回看</a>
           <a href="#rca">RCA 紀錄</a>
           <a href="#analytics">異常分析</a>
         </nav>
@@ -993,6 +1079,48 @@ export function App() {
             <p className="improvement-note">
               改善追蹤用來確認 RCA 的預防再發措施是否真的落地，例如點檢週期、備品安全庫存、首件確認或現場標示改善。
             </p>
+            <div className="effectiveness-form">
+              <div className="effectiveness-heading">
+                <strong>改善成效回看</strong>
+                {selectedImpact && (
+                  <span className={selectedImpact.difference >= 0 ? "positive" : "negative"}>
+                    {selectedImpact.difference >= 0 ? "減少" : "增加"} {Math.abs(selectedImpact.difference)} 分
+                    {selectedImpact.baseline > 0 ? `（${Math.abs(selectedImpact.rate)}%）` : ""}
+                  </span>
+                )}
+              </div>
+              <div className="effectiveness-fields">
+                <label>
+                  改善前停機時間（分）
+                  <input
+                    type="number"
+                    min="0"
+                    value={selected.baselineDowntime ?? 0}
+                    onChange={(event) => updateSelected({ baselineDowntime: Number(event.target.value) || 0 })}
+                  />
+                </label>
+                <label>
+                  近期追蹤停機時間（分）
+                  <input
+                    type="number"
+                    min="0"
+                    value={selected.recentDowntime ?? ""}
+                    onChange={(event) => updateSelected({ recentDowntime: event.target.value === "" ? null : Number(event.target.value) })}
+                  />
+                </label>
+              </div>
+              <label className="full-field">
+                追蹤驗證備註
+                <textarea
+                  value={selected.followUpNote ?? ""}
+                  onChange={(event) => updateSelected({ followUpNote: event.target.value })}
+                  placeholder="例如：改善後追蹤兩週，未再發生相同異常。"
+                />
+              </label>
+              <button type="button" className="secondary-button" onClick={recordImprovementEffect} disabled={!selectedImpact}>
+                記錄改善成效
+              </button>
+            </div>
           </section>
 
           <section className="panel" id="rca">
@@ -1046,6 +1174,40 @@ export function App() {
                   <strong>{item.value}分</strong>
                 </div>
               ))}
+            </div>
+            <div className="effectiveness-summary" id="effectiveness">
+              <div className="panel-heading">
+                <div>
+                  <p className="section-label">Improvement Effectiveness</p>
+                  <h3>改善成效摘要</h3>
+                </div>
+              </div>
+              <div className="effectiveness-kpis">
+                <article>
+                  <span>已結案案件</span>
+                  <strong>{improvementAnalytics.completed}</strong>
+                </article>
+                <article>
+                  <span>仍需改善追蹤</span>
+                  <strong>{improvementAnalytics.active}</strong>
+                </article>
+                <article>
+                  <span>已驗證減少停機</span>
+                  <strong>{improvementAnalytics.reducedMinutes}分</strong>
+                </article>
+              </div>
+              <div className="recurring-list">
+                <strong>重複異常類型</strong>
+                {improvementAnalytics.recurring.length ? (
+                  <div>
+                    {improvementAnalytics.recurring.map((item) => (
+                      <span key={item.label}>{item.label} {item.count} 件</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p>目前沒有重複發生的異常類型。</p>
+                )}
+              </div>
             </div>
           </section>
         </section>

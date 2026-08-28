@@ -891,6 +891,116 @@ textarea {
   padding: 11px;
 }
 
+.effectiveness-form {
+  margin-top: 16px;
+  border-top: 1px solid #dfe8ee;
+  padding-top: 16px;
+}
+
+.effectiveness-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #314859;
+  font-size: 13px;
+}
+
+.effectiveness-heading span {
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.effectiveness-heading .positive {
+  background: #e5f5eb;
+  color: #286f45;
+}
+
+.effectiveness-heading .negative {
+  background: #fee8e5;
+  color: #a7352e;
+}
+
+.effectiveness-fields,
+.effectiveness-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.effectiveness-summary {
+  margin-top: 22px;
+  border-top: 1px solid #dfe8ee;
+  padding-top: 18px;
+}
+
+.effectiveness-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.effectiveness-kpis article {
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 12px;
+}
+
+.effectiveness-kpis span,
+.effectiveness-kpis strong {
+  display: block;
+}
+
+.effectiveness-kpis span {
+  color: #607382;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.effectiveness-kpis strong {
+  margin-top: 7px;
+  color: #1a2a3a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.recurring-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  border-left: 4px solid #c98724;
+  background: #fffaf0;
+  padding: 11px;
+}
+
+.recurring-list > strong {
+  color: #6f541d;
+  font-size: 13px;
+}
+
+.recurring-list div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.recurring-list span {
+  border-radius: 999px;
+  background: #fff2d9;
+  color: #8f5d11;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 8px;
+}
+
+.recurring-list p {
+  margin: 0;
+  color: #607382;
+  font-size: 12px;
+}
+
 .chart-block {
   display: grid;
   gap: 11px;
@@ -973,7 +1083,8 @@ textarea {
 
   .sla-rule-grid,
   .improvement-board,
-  .review-checklist {
+  .review-checklist,
+  .effectiveness-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1011,7 +1122,9 @@ textarea {
   .assign-row,
   .review-checklist,
   .sla-rule-grid,
-  .improvement-board {
+  .improvement-board,
+  .effectiveness-fields,
+  .effectiveness-kpis {
     grid-template-columns: 1fr;
   }
 
