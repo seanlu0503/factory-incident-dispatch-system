@@ -22,6 +22,8 @@ const statusTone = {
 
 const ownerOptions = ["未指派", "林維修", "曾工程師", "黃品管", "陳生管", "吳班長"];
 const improvementOptions = ["待改善", "改善中", "待稽核", "已改善"];
+const reportTypes = ["設備故障", "品質異常", "缺料", "換線延遲", "安全風險"];
+const reportLines = ["A 線", "B 線", "C 線"];
 
 const processSteps = [
   { status: "待確認", owner: "現場主管", detail: "確認影響範圍與嚴重程度" },
@@ -159,6 +161,35 @@ const emptyDraft = {
   reporter: "現場人員",
   description: "",
 };
+
+function getAllowedValue(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function loadIncomingReport() {
+  if (typeof window === "undefined") {
+    return { draft: { ...emptyDraft }, fromDashboard: false };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("source") !== "production-dashboard") {
+    return { draft: { ...emptyDraft }, fromDashboard: false };
+  }
+
+  return {
+    fromDashboard: true,
+    draft: {
+      ...emptyDraft,
+      line: getAllowedValue(params.get("line"), reportLines, emptyDraft.line),
+      machine: params.get("machine")?.slice(0, 40) || emptyDraft.machine,
+      workOrder: params.get("workOrder")?.slice(0, 40) || emptyDraft.workOrder,
+      type: getAllowedValue(params.get("type"), reportTypes, emptyDraft.type),
+      severity: getAllowedValue(params.get("severity"), Object.keys(severityMeta), emptyDraft.severity),
+      reporter: params.get("reporter")?.slice(0, 40) || emptyDraft.reporter,
+      description: params.get("description")?.slice(0, 300) || emptyDraft.description,
+    },
+  };
+}
 
 function Pill({ children, tone = "slate" }) {
   return <span className={`pill ${tone}`}>{children}</span>;
@@ -325,12 +356,14 @@ function loadIncidents() {
 }
 
 export function App() {
+  const [incomingReport] = useState(loadIncomingReport);
   const [incidents, setIncidents] = useState(loadIncidents);
   const [selectedId, setSelectedId] = useState(initialIncidents[0].id);
   const [lineFilter, setLineFilter] = useState("全部產線");
   const [statusFilter, setStatusFilter] = useState("全部狀態");
   const [severityFilter, setSeverityFilter] = useState("全部等級");
-  const [draft, setDraft] = useState(emptyDraft);
+  const [draft, setDraft] = useState(incomingReport.draft);
+  const [showDashboardHandoff, setShowDashboardHandoff] = useState(incomingReport.fromDashboard);
 
   const selected = incidents.find((item) => item.id === selectedId) ?? incidents[0];
 
@@ -517,6 +550,8 @@ export function App() {
     setLineFilter("全部產線");
     setStatusFilter("全部狀態");
     setSeverityFilter("全部等級");
+    setDraft({ ...emptyDraft });
+    setShowDashboardHandoff(false);
     window.localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -547,7 +582,8 @@ export function App() {
     ];
     setIncidents((current) => [incident, ...current]);
     setSelectedId(incident.id);
-    setDraft(emptyDraft);
+    setDraft({ ...emptyDraft });
+    setShowDashboardHandoff(false);
   }
 
   const maxType = Math.max(...typeStats.map((item) => item.value), 1);
@@ -642,6 +678,12 @@ export function App() {
               </div>
               <Pill tone="blue">現場端</Pill>
             </div>
+            {showDashboardHandoff && (
+              <div className="handoff-notice">
+                <strong>已從生產追蹤 Dashboard 帶入異常資訊</strong>
+                <span>請確認內容後建立異常單；此為模擬展示資料，僅保留在目前瀏覽器。</span>
+              </div>
+            )}
             <div className="form-grid">
               <label>
                 產線
@@ -662,11 +704,9 @@ export function App() {
               <label>
                 異常類型
                 <select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}>
-                  <option>設備故障</option>
-                  <option>品質異常</option>
-                  <option>缺料</option>
-                  <option>換線延遲</option>
-                  <option>安全風險</option>
+                  {reportTypes.map((type) => (
+                    <option key={type}>{type}</option>
+                  ))}
                 </select>
               </label>
               <label>

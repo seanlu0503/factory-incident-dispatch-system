@@ -338,6 +338,28 @@ a {
   gap: 12px;
 }
 
+.handoff-notice {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  border: 1px solid #b8d9e7;
+  border-left: 4px solid #24596f;
+  border-radius: 8px;
+  background: #eef8fc;
+  padding: 11px;
+}
+
+.handoff-notice strong {
+  color: #24596f;
+  font-size: 13px;
+}
+
+.handoff-notice span {
+  color: #526b7a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 label {
   display: grid;
   gap: 6px;
