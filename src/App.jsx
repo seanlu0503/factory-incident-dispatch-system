@@ -689,15 +689,10 @@ export function App() {
           </div>
         </div>
         <nav className="nav-list" aria-label="系統導覽">
-          <a href="#overview" className="active">異常總覽</a>
-          <a href="#new-report">新增回報</a>
-          <a href="#dispatch">派工看板</a>
-          <a href="#rules">流程規則</a>
-          <a href="#review">主管驗收</a>
-          <a href="#improvement">改善追蹤</a>
-          <a href="#effectiveness">成效回看</a>
-          <a href="#rca">RCA 紀錄</a>
-          <a href="#analytics">異常分析</a>
+          <a href="#overview" className="active">工作總覽</a>
+          <a href="#new-report">回報與派工</a>
+          <a href="#review">結案與改善</a>
+          <a href="#analytics">分析回看</a>
         </nav>
         <section className="side-note">
           <p className="section-label">AI Collaboration</p>
