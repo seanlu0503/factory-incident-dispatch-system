@@ -82,16 +82,23 @@ const initialIncidents = [
     workOrder: "MO-260711-026",
     type: "設備故障",
     severity: "停線",
-    status: "待料",
+    status: "已結案",
     reporter: "許組長",
     owner: "林維修",
     downtime: 76,
     description: "油壓異常警報，產線暫停，已通知維修工程師。",
     cause: "油壓閥回壓不穩，需更換密封件。",
-    action: "等待備品到料，暫以 B 線支援部分產能。",
+    action: "更換油壓閥密封件，完成壓力測試後由 B 線支援逐步切回 PRESS-04。",
     prevention: "建立油壓閥備品安全庫存，低於 2 組自動提醒。",
-    reviewNote: "",
-    improvementStatus: "待改善",
+    reviewNote: "連續兩週壓力值穩定，首件與量產抽驗正常，主管驗收通過。",
+    improvementStatus: "已改善",
+    baselineDowntime: 76,
+    recentDowntime: 24,
+    followUpNote: "改善後兩週追蹤，油壓異常造成的累計停機時間由 76 分降至 24 分。",
+    closure: {
+      result: "驗收通過，異常已排除",
+      closedAt: "07/11 16:12",
+    },
   },
   {
     id: "INC-260711-004",
@@ -194,16 +201,22 @@ function getAllowedValue(value, allowed, fallback) {
 
 function loadIncomingReport() {
   if (typeof window === "undefined") {
-    return { draft: { ...emptyDraft }, fromDashboard: false };
+    return { draft: { ...emptyDraft }, fromDashboard: false, selectedId: initialIncidents[0].id };
   }
 
   const params = new URLSearchParams(window.location.search);
   if (params.get("source") !== "production-dashboard") {
-    return { draft: { ...emptyDraft }, fromDashboard: false };
+    return { draft: { ...emptyDraft }, fromDashboard: false, selectedId: initialIncidents[0].id };
   }
+
+  const requestedIncidentId = params.get("incidentId");
+  const selectedId = initialIncidents.some((item) => item.id === requestedIncidentId)
+    ? requestedIncidentId
+    : initialIncidents[0].id;
 
   return {
     fromDashboard: true,
+    selectedId,
     draft: {
       ...emptyDraft,
       line: getAllowedValue(params.get("line"), reportLines, emptyDraft.line),
@@ -315,6 +328,10 @@ function createHistory({ action, actor, status, note }) {
 }
 
 function ensureHistory(incident) {
+  const isLegacyPressCase = incident.id === "INC-260711-003" && incident.status !== "已結案";
+  const migratedIncident = isLegacyPressCase
+    ? { ...initialIncidents.find((item) => item.id === "INC-260711-003"), history: incident.history }
+    : incident;
   const normalized = {
     reviewNote: "",
     improvementStatus: "待改善",
@@ -322,7 +339,7 @@ function ensureHistory(incident) {
     baselineDowntime: incident.downtime ?? 0,
     recentDowntime: null,
     followUpNote: "",
-    ...incident,
+    ...migratedIncident,
   };
 
   if (Array.isArray(normalized.history) && normalized.history.length > 0) {
@@ -404,7 +421,7 @@ function loadIncidents() {
 export function App() {
   const [incomingReport] = useState(loadIncomingReport);
   const [incidents, setIncidents] = useState(loadIncidents);
-  const [selectedId, setSelectedId] = useState(initialIncidents[0].id);
+  const [selectedId, setSelectedId] = useState(incomingReport.selectedId);
   const [lineFilter, setLineFilter] = useState("全部產線");
   const [statusFilter, setStatusFilter] = useState("全部狀態");
   const [severityFilter, setSeverityFilter] = useState("全部等級");
