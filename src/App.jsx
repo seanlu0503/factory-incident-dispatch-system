@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 
 const statusFlow = ["待確認", "已派工", "處理中", "待料", "已排除", "待驗收", "已結案"];
 const STORAGE_KEY = "factory-incident-dispatch-system:v5";
+const dashboardCaseUrl =
+  "https://seanlu0503.github.io/factory-portfolio-dashboard/?orderId=MO-260711-026#alerts";
 
 const severityMeta = {
   一般: { tone: "slate", score: 1, slaMinutes: 480 },
@@ -735,6 +737,7 @@ export function App() {
           <div className="hero-actions">
             <a href="#new-report">新增異常</a>
             <a href="#dispatch">查看派工</a>
+            <a href={dashboardCaseUrl} target="_blank" rel="noreferrer">回看生產風險</a>
             <button type="button" onClick={resetDemo}>重設展示</button>
           </div>
         </header>
